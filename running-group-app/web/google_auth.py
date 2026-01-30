@@ -229,15 +229,33 @@ def render_google_oauth_button() -> bool:
 
 def _get_redirect_uri() -> str:
     """Get the OAuth redirect URI based on current URL."""
-    # In production, this should be the deployed URL
-    # For local development, use localhost
+    import os
+
+    # 1. Check Streamlit secrets first
     try:
-        # Try to get from Streamlit config
-        import os
-        base_url = os.environ.get("STREAMLIT_URL", "http://localhost:8501")
-        return base_url
+        redirect_uri = st.secrets.get("google", {}).get("redirect_uri")
+        if redirect_uri:
+            return redirect_uri
     except Exception:
-        return "http://localhost:8501"
+        pass
+
+    # 2. Check environment variable
+    env_url = os.environ.get("STREAMLIT_URL")
+    if env_url:
+        return env_url
+
+    # 3. Try to detect from Streamlit Cloud hostname
+    try:
+        # On Streamlit Cloud, check if we're on a .streamlit.app domain
+        import streamlit.web.server.websocket_headers as headers
+        host = headers._get_websocket_headers().get("Host", "")
+        if "streamlit.app" in host:
+            return f"https://{host}/"
+    except Exception:
+        pass
+
+    # 4. Default to localhost for local development
+    return "http://localhost:8501/"
 
 
 def refresh_credentials_if_needed() -> bool:
