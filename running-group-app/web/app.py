@@ -13,8 +13,9 @@ import streamlit as st
 import sys
 from pathlib import Path
 
-# Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Add directories to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))  # For core imports
+sys.path.insert(0, str(Path(__file__).parent))  # For web imports (google_auth, strava_auth)
 
 from core import get_config, set_config, load_config_from_dict
 
@@ -195,8 +196,8 @@ def render_settings():
 
 def render_connections_settings():
     """Render the connections tab."""
-    from .google_auth import render_google_oauth_button, clear_credentials as clear_google
-    from .strava_auth import render_strava_oauth_button, clear_credentials as clear_strava
+    from google_auth import render_google_oauth_button, clear_credentials as clear_google
+    from strava_auth import render_strava_oauth_button, clear_credentials as clear_strava
 
     st.subheader("Google Connection")
     st.caption("Required for calendar sync and private sheet access")
