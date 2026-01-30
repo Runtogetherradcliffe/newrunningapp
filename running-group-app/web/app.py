@@ -285,6 +285,26 @@ def render_sheet_settings():
     """Render the spreadsheet settings tab."""
     config = get_config()
 
+    # Template download section
+    st.subheader("📥 Get Started")
+    st.write("Need a spreadsheet? Download our template and upload it to Google Sheets.")
+
+    template_csv = """Date,Route 1 - Name,Route 1 URL,Route 2 - Name,Route 2 URL,Route 3 name,Route 3 URL,Meeting Point,Notes
+2026-02-05,Riverside Loop,https://strava.com/routes/123,Park Circuit,https://strava.com/routes/456,Town Walk,,The Running Club,
+2026-02-12,Hill Challenge,,Valley Trail,,,,,
+2026-02-19,Forest Trail,,Canal Path,,Beginner Walk,,,
+2026-02-26,,,,,,,,No run - half term"""
+
+    st.download_button(
+        label="⬇️ Download Template (CSV)",
+        data=template_csv,
+        file_name="running_group_schedule_template.csv",
+        mime="text/csv",
+    )
+    st.caption("Open the downloaded CSV in Google Sheets, then share it as 'Anyone with the link can view'")
+
+    st.divider()
+
     st.subheader("Google Sheet")
 
     sheet_url = st.text_input(
