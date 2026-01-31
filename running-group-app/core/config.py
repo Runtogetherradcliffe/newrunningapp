@@ -46,14 +46,15 @@ class SheetConfig:
     settings_tab_name: str = "Settings"
 
     # Column mappings (can be customised per group)
+    # Default names match the downloadable template
     columns: dict = field(default_factory=lambda: {
-        "date": "Date (Thu)",
+        "date": "Date",
         "route_1_name": "Route 1 - Name",
-        "route_1_url": "Route 1 - Route Link (Source URL)",
-        "route_1_distance": "Route 1 - Distance (km)",
+        "route_1_url": "Route 1 URL",
+        "route_1_distance": "Route 1 Distance",
         "route_2_name": "Route 2 - Name",
-        "route_2_url": "Route 2 - Route Link (Source URL)",
-        "route_2_distance": "Route 2 - Distance (km)",
+        "route_2_url": "Route 2 URL",
+        "route_2_distance": "Route 2 Distance",
         "route_3_name": "Route 3 name",
         "route_3_url": "Route 3 URL",
         "route_3_description": "Route 3 description",

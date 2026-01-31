@@ -45,8 +45,63 @@ def init_session_state():
     if "config_data" not in st.session_state:
         st.session_state.config_data = {}
 
+    # Load saved config from session state or secrets
+    _load_saved_config()
+
+
+def _load_saved_config():
+    """Load saved configuration from session state and secrets."""
+    config = get_config()
+
+    # First try to load from Streamlit secrets (persistent across sessions)
+    try:
+        if "app" in st.secrets:
+            app_secrets = st.secrets["app"]
+            if "spreadsheet_id" in app_secrets:
+                config.sheet.spreadsheet_id = app_secrets["spreadsheet_id"]
+            if "schedule_tab_name" in app_secrets:
+                config.sheet.schedule_tab_name = app_secrets["schedule_tab_name"]
+            if "group_name" in app_secrets:
+                config.group.name = app_secrets["group_name"]
+            if "default_meeting_location" in app_secrets:
+                config.group.default_meeting_location = app_secrets["default_meeting_location"]
+            if "booking_url" in app_secrets:
+                config.booking.booking_url = app_secrets["booking_url"]
+            st.session_state.setup_complete = bool(config.sheet.spreadsheet_id)
+    except Exception:
+        pass  # Secrets not available
+
+    # Then override with session state (for current session edits)
+    if "saved_sheet_id" in st.session_state:
+        config.sheet.spreadsheet_id = st.session_state.saved_sheet_id
+    if "saved_tab_name" in st.session_state:
+        config.sheet.schedule_tab_name = st.session_state.saved_tab_name
+    if "saved_group_name" in st.session_state:
+        config.group.name = st.session_state.saved_group_name
+    if "saved_meeting_location" in st.session_state:
+        config.group.default_meeting_location = st.session_state.saved_meeting_location
+
+    # Mark setup complete if we have a spreadsheet ID
+    if config.sheet.spreadsheet_id:
+        st.session_state.setup_complete = True
+
 
 init_session_state()
+
+
+# ============================================================================
+# Check Google Connection on Startup
+# ============================================================================
+
+def check_google_connection():
+    """Check if Google credentials exist and update session state."""
+    from google_auth import get_stored_credentials
+    credentials = get_stored_credentials()
+    st.session_state.google_connected = credentials is not None
+
+
+# Run connection check on startup
+check_google_connection()
 
 
 # ============================================================================
@@ -277,6 +332,10 @@ def render_group_settings():
         config.group.default_meeting_location = meeting_location
         config.group.run_day_of_week = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].index(run_day)
 
+        # Persist to session state
+        st.session_state.saved_group_name = name
+        st.session_state.saved_meeting_location = meeting_location
+
         st.success("✅ Group settings saved!")
         st.session_state.setup_complete = True
 
@@ -333,21 +392,58 @@ def render_sheet_settings():
 
     st.info("💡 Make sure your sheet is shared as **'Anyone with the link can view'**")
 
-    if st.button("Test Connection"):
-        if sheet_id:
-            try:
-                from core import load_schedule_dataframe
-                # Temporarily update config
+    col1, col2 = st.columns(2)
+
+    with col1:
+        if st.button("Test Connection"):
+            if sheet_id:
+                try:
+                    from core import load_schedule_dataframe
+                    # Temporarily update config
+                    config.sheet.spreadsheet_id = sheet_id
+                    config.sheet.schedule_tab_name = tab_name
+
+                    df = load_schedule_dataframe()
+                    st.success(f"✅ Connected! Found {len(df)} rows.")
+                    st.dataframe(df.head())
+                except Exception as e:
+                    st.error(f"❌ Failed to connect: {e}")
+            else:
+                st.warning("Please enter a Sheet URL or ID")
+
+    with col2:
+        if st.button("Save Sheet Settings", type="primary"):
+            if sheet_id:
+                # Update config
                 config.sheet.spreadsheet_id = sheet_id
                 config.sheet.schedule_tab_name = tab_name
 
-                df = load_schedule_dataframe()
-                st.success(f"✅ Connected! Found {len(df)} rows.")
-                st.dataframe(df.head())
-            except Exception as e:
-                st.error(f"❌ Failed to connect: {e}")
-        else:
-            st.warning("Please enter a Sheet URL or ID")
+                # Persist to session state
+                st.session_state.saved_sheet_id = sheet_id
+                st.session_state.saved_tab_name = tab_name
+                st.session_state.setup_complete = True
+
+                st.success("✅ Sheet settings saved!")
+            else:
+                st.warning("Please enter a Sheet URL or ID first")
+
+    st.divider()
+
+    # Persistence tip
+    with st.expander("💾 Save settings permanently"):
+        st.markdown("""
+        Settings are saved for this session. To save them permanently, add to your
+        Streamlit secrets (`.streamlit/secrets.toml` or in the Streamlit Cloud dashboard):
+
+        ```toml
+        [app]
+        spreadsheet_id = "your-sheet-id"
+        schedule_tab_name = "Schedule"
+        group_name = "Your Running Group"
+        default_meeting_location = "Your Location"
+        booking_url = "https://..."
+        ```
+        """)
 
     st.divider()
 

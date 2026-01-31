@@ -184,31 +184,47 @@ def parse_schedule(df: pd.DataFrame) -> List[ScheduledRun]:
         route_2 = None
         route_3 = None
 
+        # Helper to find column value with fallbacks
+        def get_col(key: str, fallbacks: list = None) -> str:
+            """Try to get column value, with fallback column names."""
+            # First try the configured column name
+            col_name = cols.get(key, "")
+            if col_name and col_name in df.columns:
+                return _clean_value(row.get(col_name, ""))
+
+            # Try fallbacks
+            if fallbacks:
+                for fb in fallbacks:
+                    if fb in df.columns:
+                        return _clean_value(row.get(fb, ""))
+
+            return ""
+
         # Route 1
-        r1_name = _clean_value(row.get(cols.get("route_1_name", "Route 1 - Name"), ""))
+        r1_name = get_col("route_1_name", ["Route 1 - Name", "Route 1 Name", "Route1"])
         if r1_name:
             route_1 = Route(
                 name=r1_name,
-                url=_make_https(_clean_value(row.get(cols.get("route_1_url", ""), ""))),
-                distance_km=_try_float(row.get(cols.get("route_1_distance", ""), "")),
+                url=_make_https(get_col("route_1_url", ["Route 1 URL", "Route 1 - URL", "Route1 URL"])),
+                distance_km=_try_float(get_col("route_1_distance", ["Route 1 Distance", "Route 1 - Distance"])),
             )
 
         # Route 2
-        r2_name = _clean_value(row.get(cols.get("route_2_name", "Route 2 - Name"), ""))
+        r2_name = get_col("route_2_name", ["Route 2 - Name", "Route 2 Name", "Route2"])
         if r2_name:
             route_2 = Route(
                 name=r2_name,
-                url=_make_https(_clean_value(row.get(cols.get("route_2_url", ""), ""))),
-                distance_km=_try_float(row.get(cols.get("route_2_distance", ""), "")),
+                url=_make_https(get_col("route_2_url", ["Route 2 URL", "Route 2 - URL", "Route2 URL"])),
+                distance_km=_try_float(get_col("route_2_distance", ["Route 2 Distance", "Route 2 - Distance"])),
             )
 
         # Route 3 (optional walk/C25K)
-        r3_name = _clean_value(row.get(cols.get("route_3_name", "Route 3 name"), ""))
-        r3_desc = _clean_value(row.get(cols.get("route_3_description", "Route 3 description"), ""))
+        r3_name = get_col("route_3_name", ["Route 3 name", "Route 3 - Name", "Route 3 Name"])
+        r3_desc = get_col("route_3_description", ["Route 3 description", "Route 3 - Description"])
         if r3_name or r3_desc:
             route_3 = Route(
                 name=r3_name or r3_desc,
-                url=_make_https(_clean_value(row.get(cols.get("route_3_url", "Route 3 URL"), ""))),
+                url=_make_https(get_col("route_3_url", ["Route 3 URL", "Route 3 - URL"])),
             )
 
         # Meeting point
@@ -223,7 +239,20 @@ def parse_schedule(df: pd.DataFrame) -> List[ScheduledRun]:
             meeting_point = config.group.default_meeting_location
 
         # Check if "on tour" (not at usual location)
-        is_on_tour = meeting_point.lower() != config.group.default_meeting_location.lower()
+        # Normalize both strings for comparison (lowercase, strip whitespace)
+        default_location = config.group.default_meeting_location.lower().strip()
+        current_location = meeting_point.lower().strip()
+
+        # Only consider "on tour" if:
+        # 1. There's a default location set (not empty)
+        # 2. The current location is different from the default
+        # 3. The notes don't contain "tour" (explicit override)
+        is_on_tour = (
+            bool(default_location) and
+            bool(current_location) and
+            current_location != default_location and
+            "tour" not in notes.lower()  # Don't double-flag if already noted
+        )
 
         scheduled_run = ScheduledRun(
             date=run_date,

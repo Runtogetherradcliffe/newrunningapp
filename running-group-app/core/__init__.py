@@ -45,6 +45,7 @@ from .message_generator import (
     MessageSet,
     generate_messages,
     format_date_uk,
+    format_time_12h,
 )
 
 from .calendar_sync import (
@@ -91,6 +92,7 @@ __all__ = [
     "MessageSet",
     "generate_messages",
     "format_date_uk",
+    "format_time_12h",
     # Calendar
     "CalendarEvent",
     "SyncResult",

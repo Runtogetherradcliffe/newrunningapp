@@ -131,6 +131,38 @@ def format_date_uk(d: date) -> str:
     return f"{_ordinal(d.day)} {d.strftime('%B')}"
 
 
+def format_time_12h(time_str: str) -> str:
+    """
+    Format time string to 12-hour format.
+
+    Examples:
+        "19:00" -> "7pm"
+        "19:30" -> "7:30pm"
+        "09:00" -> "9am"
+    """
+    if not time_str:
+        return "7pm"  # Default
+
+    try:
+        # Handle HH:MM format
+        parts = time_str.split(":")
+        hour = int(parts[0])
+        minute = int(parts[1]) if len(parts) > 1 else 0
+
+        # Convert to 12-hour
+        period = "am" if hour < 12 else "pm"
+        hour_12 = hour % 12
+        if hour_12 == 0:
+            hour_12 = 12
+
+        if minute == 0:
+            return f"{hour_12}{period}"
+        else:
+            return f"{hour_12}:{minute:02d}{period}"
+    except (ValueError, IndexError):
+        return time_str  # Return as-is if parsing fails
+
+
 def _get_seeded_rng(run_date: date, offset: int = 0) -> random.Random:
     """Get a random generator seeded by date for consistent weekly variation."""
     seed_str = str(run_date)
@@ -229,7 +261,13 @@ def generate_messages(
 
     # Count routes and options
     num_routes = len(run.routes)
-    num_options = num_routes + (1 if include_jeffing else 0)
+    # Options are: Walk (if route_3) + Jeffing (if enabled) + 5k + 8k
+    # Always show 5k and 8k as base options
+    num_options = 2  # 5k + 8k always listed
+    if run.route_3:
+        num_options += 1  # Walk option
+    if include_jeffing:
+        num_options += 1  # Jeffing option
 
     # Get seeded RNGs for each platform (consistent per date, varied per platform)
     rng_email = _get_seeded_rng(run.date, 0)
@@ -280,9 +318,9 @@ def _generate_email(
 
     # Meeting details
     if run.is_on_tour:
-        lines.append(f"📍 This week we're On Tour – meeting at {run.meeting_point} at {run.start_time.replace(':00', 'pm')}")
+        lines.append(f"📍 This week we're On Tour – meeting at {run.meeting_point} at {format_time_12h(run.start_time)}")
     else:
-        lines.append(f"📍 Meeting at: {run.meeting_point} at {run.start_time.replace(':00', 'pm')}")
+        lines.append(f"📍 Meeting at: {run.meeting_point} at {format_time_12h(run.start_time)}")
 
     lines.append("")
 
@@ -298,15 +336,15 @@ def _generate_email(
 
     lines.append("")
 
-    # Booking info
-    lines.append("How to book")
-    lines.append("")
-    if config.booking.booking_url:
-        lines.append(f"📲 Book your place: {config.booking.booking_url}")
-    if config.booking.cancellation_url:
-        lines.append(f"To cancel: {config.booking.cancellation_url}")
-
-    lines.append("")
+    # Booking info (only show if there's something to show)
+    if config.booking.booking_url or config.booking.cancellation_url:
+        lines.append("How to book")
+        lines.append("")
+        if config.booking.booking_url:
+            lines.append(f"📲 Book your place: {config.booking.booking_url}")
+        if config.booking.cancellation_url:
+            lines.append(f"To cancel: {config.booking.cancellation_url}")
+        lines.append("")
 
     # Safety and weather
     lines.append("Additional information")
@@ -372,9 +410,9 @@ def _generate_facebook(
 
     # Meeting details
     if run.is_on_tour:
-        lines.append(f"📍 This week we're On Tour – meeting at {run.meeting_point} at {run.start_time.replace(':00', 'pm')}")
+        lines.append(f"📍 This week we're On Tour – meeting at {run.meeting_point} at {format_time_12h(run.start_time)}")
     else:
-        lines.append(f"📍 Meeting at: {run.meeting_point} at {run.start_time.replace(':00', 'pm')}")
+        lines.append(f"📍 Meeting at: {run.meeting_point} at {format_time_12h(run.start_time)}")
 
     lines.append("")
 
@@ -447,9 +485,9 @@ def _generate_whatsapp(
 
     # Meeting details
     if run.is_on_tour:
-        lines.append(f"📍 This week we're On Tour – meeting at {run.meeting_point} at {run.start_time.replace(':00', 'pm')}")
+        lines.append(f"📍 This week we're On Tour – meeting at {run.meeting_point} at {format_time_12h(run.start_time)}")
     else:
-        lines.append(f"📍 Meeting at: {run.meeting_point} at {run.start_time.replace(':00', 'pm')}")
+        lines.append(f"📍 Meeting at: {run.meeting_point} at {format_time_12h(run.start_time)}")
 
     lines.append("")
 
