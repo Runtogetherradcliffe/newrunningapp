@@ -579,7 +579,7 @@ def render_calendar_settings():
 def render_compose():
     """Render the message composer page."""
     st.title("📝 Compose Messages")
-    st.caption("v2.1")  # Version marker
+    st.caption("v2.2")  # Version marker
 
     try:
         from core import load_schedule, get_upcoming_runs, generate_messages, format_date_uk, load_schedule_dataframe
@@ -633,6 +633,9 @@ def render_compose():
         # Generate messages
         messages = generate_messages(run, include_jeffing=include_jeffing)
 
+        # Create a unique key suffix based on options to force refresh when they change
+        key_suffix = f"{run.date}_{include_jeffing}"
+
         # Display in tabs
         tab1, tab2, tab3 = st.tabs(["📧 Email", "📘 Facebook", "💬 WhatsApp"])
 
@@ -642,7 +645,7 @@ def render_compose():
                 "Email body",
                 value=messages.email.body,
                 height=400,
-                key="email_body",
+                key=f"email_body_{key_suffix}",
             )
             if st.button("Copy Email", key="copy_email"):
                 st.success("Copied! (Clipboard functionality coming soon)")
@@ -652,7 +655,7 @@ def render_compose():
                 "Facebook post",
                 value=messages.facebook.body,
                 height=400,
-                key="fb_body",
+                key=f"fb_body_{key_suffix}",
             )
             if st.button("Copy Facebook", key="copy_fb"):
                 st.success("Copied! (Clipboard functionality coming soon)")
@@ -662,7 +665,7 @@ def render_compose():
                 "WhatsApp message",
                 value=messages.whatsapp.body,
                 height=400,
-                key="wa_body",
+                key=f"wa_body_{key_suffix}",
             )
             if st.button("Copy WhatsApp", key="copy_wa"):
                 st.success("Copied! (Clipboard functionality coming soon)")
