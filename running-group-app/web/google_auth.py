@@ -75,13 +75,74 @@ def get_google_client_config() -> Optional[dict]:
 
 
 def get_stored_credentials() -> Optional[GoogleCredentials]:
-    """Get stored Google credentials from session state."""
+    """
+    Get stored Google credentials.
+
+    Checks in order:
+    1. Session state (current session)
+    2. Streamlit secrets (persistent across sessions)
+    """
+    # First check session state
     if "google_credentials" in st.session_state:
         creds_data = st.session_state.google_credentials
         if isinstance(creds_data, dict):
             return GoogleCredentials(**creds_data)
         return creds_data
+
+    # Then check secrets for persistent tokens
+    try:
+        google_secrets = st.secrets.get("google", {})
+        refresh_token = google_secrets.get("refresh_token")
+
+        if refresh_token:
+            # We have a stored refresh token - create credentials from it
+            client_id = google_secrets.get("client_id", "")
+            client_secret = google_secrets.get("client_secret", "")
+
+            creds = GoogleCredentials(
+                access_token="",  # Will be refreshed
+                refresh_token=refresh_token,
+                client_id=client_id,
+                client_secret=client_secret,
+            )
+
+            # Try to refresh and get a valid access token
+            if _refresh_stored_credentials(creds):
+                # Store in session state for this session
+                store_credentials(creds)
+                return creds
+
+    except Exception:
+        pass
+
     return None
+
+
+def _refresh_stored_credentials(creds: GoogleCredentials) -> bool:
+    """Refresh credentials using the refresh token. Returns True if successful."""
+    try:
+        from google.oauth2.credentials import Credentials
+        from google.auth.transport.requests import Request
+
+        google_creds = Credentials(
+            token=None,
+            refresh_token=creds.refresh_token,
+            token_uri=creds.token_uri,
+            client_id=creds.client_id,
+            client_secret=creds.client_secret,
+        )
+
+        google_creds.refresh(Request())
+
+        # Update our credentials object
+        creds.access_token = google_creds.token
+        creds.expiry = google_creds.expiry.isoformat() if google_creds.expiry else None
+
+        return True
+
+    except Exception as e:
+        st.warning(f"Failed to refresh stored credentials: {e}")
+        return False
 
 
 def store_credentials(credentials: GoogleCredentials):
@@ -176,14 +237,18 @@ def render_google_oauth_button() -> bool:
             flow.fetch_token(code=auth_code)
             credentials = flow.credentials
 
-            store_credentials(GoogleCredentials(
+            new_creds = GoogleCredentials(
                 access_token=credentials.token,
                 refresh_token=credentials.refresh_token,
                 token_uri=credentials.token_uri,
                 client_id=credentials.client_id,
                 client_secret=credentials.client_secret,
                 expiry=credentials.expiry.isoformat() if credentials.expiry else None,
-            ))
+            )
+            store_credentials(new_creds)
+
+            # Store the refresh token in session state so we can show it
+            st.session_state.new_refresh_token = credentials.refresh_token
 
             # Clear the code from URL
             st.query_params.clear()

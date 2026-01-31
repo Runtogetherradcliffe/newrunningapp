@@ -80,6 +80,12 @@ def _load_saved_config():
         config.group.name = st.session_state.saved_group_name
     if "saved_meeting_location" in st.session_state:
         config.group.default_meeting_location = st.session_state.saved_meeting_location
+    if "saved_start_time" in st.session_state:
+        config.group.default_start_time = st.session_state.saved_start_time
+    if "saved_booking_url" in st.session_state:
+        config.booking.booking_url = st.session_state.saved_booking_url
+    if "saved_cancellation_url" in st.session_state:
+        config.booking.cancellation_url = st.session_state.saved_cancellation_url
 
     # Mark setup complete if we have a spreadsheet ID
     if config.sheet.spreadsheet_id:
@@ -259,6 +265,25 @@ def render_connections_settings():
 
     if st.session_state.google_connected:
         st.success("✅ Connected to Google")
+
+        # Show persistence instructions if we have a new refresh token
+        if "new_refresh_token" in st.session_state:
+            with st.expander("💾 Save connection permanently", expanded=True):
+                st.warning("⚠️ Your Google connection will be lost when the session ends!")
+                st.markdown("""
+                To keep Google connected permanently, add this to your Streamlit secrets:
+
+                ```toml
+                refresh_token = "{}"
+                ```
+                """.format(st.session_state.new_refresh_token))
+
+                st.caption("In Streamlit Cloud: Go to App Settings → Secrets and add the `refresh_token` line to your existing `[google]` section.")
+
+                if st.button("I've saved it ✓"):
+                    del st.session_state.new_refresh_token
+                    st.rerun()
+
         if st.button("Disconnect Google"):
             clear_google()
             st.rerun()
@@ -309,17 +334,41 @@ def render_group_settings():
     meeting_location = st.text_input(
         "Default Meeting Location",
         value=config.group.default_meeting_location,
+        help="Used to detect 'On Tour' weeks when meeting elsewhere"
     )
+
+    # Parse default start time
+    from datetime import time as dt_time
+    try:
+        default_time_parts = config.group.default_start_time.split(":")
+        default_time = dt_time(int(default_time_parts[0]), int(default_time_parts[1]) if len(default_time_parts) > 1 else 0)
+    except:
+        default_time = dt_time(19, 0)
 
     start_time = st.time_input(
         "Default Start Time",
-        value=None,  # TODO: Parse from config
+        value=default_time,
     )
 
     run_day = st.selectbox(
         "Run Day",
         options=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
         index=config.group.run_day_of_week,
+    )
+
+    st.subheader("Booking Links")
+    st.caption("Optional links for your booking platform")
+
+    booking_url = st.text_input(
+        "Booking URL",
+        value=config.booking.booking_url,
+        help="Link where members can book their place"
+    )
+
+    cancellation_url = st.text_input(
+        "Cancellation URL (optional)",
+        value=config.booking.cancellation_url,
+        help="Link where members can cancel their booking"
     )
 
     if st.button("Save Group Settings", type="primary"):
@@ -330,11 +379,19 @@ def render_group_settings():
         config.group.longitude = longitude
         config.group.timezone = timezone
         config.group.default_meeting_location = meeting_location
+        config.group.default_start_time = start_time.strftime("%H:%M")
         config.group.run_day_of_week = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].index(run_day)
+
+        # Update booking config
+        config.booking.booking_url = booking_url
+        config.booking.cancellation_url = cancellation_url
 
         # Persist to session state
         st.session_state.saved_group_name = name
         st.session_state.saved_meeting_location = meeting_location
+        st.session_state.saved_start_time = start_time.strftime("%H:%M")
+        st.session_state.saved_booking_url = booking_url
+        st.session_state.saved_cancellation_url = cancellation_url
 
         st.success("✅ Group settings saved!")
         st.session_state.setup_complete = True
@@ -521,11 +578,27 @@ def render_compose():
         # Options
         col1, col2 = st.columns(2)
         with col1:
-            include_jeffing = st.checkbox("Include Jeffing option", value=True)
+            include_jeffing = st.checkbox(
+                "Include Jeffing option",
+                value=True,
+                key="include_jeffing_checkbox"
+            )
         with col2:
             pass  # Space for future options
 
         st.divider()
+
+        # Debug info (expandable)
+        with st.expander("🔍 Debug: Schedule Data"):
+            st.write(f"**Start Time:** `{run.start_time}`")
+            st.write(f"**Meeting Point:** `{run.meeting_point}`")
+            st.write(f"**Include Jeffing:** `{include_jeffing}`")
+            if run.route_1:
+                st.write(f"**Route 1:** {run.route_1.name} | URL: `{run.route_1.url or 'None'}`")
+            if run.route_2:
+                st.write(f"**Route 2:** {run.route_2.name} | URL: `{run.route_2.url or 'None'}`")
+            if run.route_3:
+                st.write(f"**Route 3:** {run.route_3.name} | URL: `{run.route_3.url or 'None'}`")
 
         # Generate messages
         messages = generate_messages(run, include_jeffing=include_jeffing)
