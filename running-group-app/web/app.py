@@ -551,16 +551,38 @@ def render_calendar_settings():
         )
 
         if st.button("Create Calendar", type="primary"):
-            # TODO: Implement calendar creation
-            st.info("Calendar creation will be implemented with Google OAuth")
+            try:
+                from core import create_calendar, get_calendar_service
+                from google_auth import get_google_oauth_credentials
+
+                credentials = get_google_oauth_credentials()
+                if not credentials:
+                    st.error("Google not connected. Please connect in the Connections tab.")
+                else:
+                    with st.spinner("Creating calendar..."):
+                        # Build the calendar service from credentials
+                        service = get_calendar_service(credentials)
+                        calendar_id = create_calendar(service, calendar_name, config.group.timezone)
+
+                        if calendar_id:
+                            config.calendar.calendar_id = calendar_id
+                            config.calendar.calendar_name = calendar_name
+                            st.session_state.saved_calendar_id = calendar_id
+                            st.success(f"✅ Calendar created: {calendar_name}")
+                            st.rerun()
+                        else:
+                            st.error("Failed to create calendar")
+            except Exception as e:
+                st.error(f"Error creating calendar: {e}")
 
 
 def render_compose():
     """Render the message composer page."""
     st.title("📝 Compose Messages")
+    st.caption("v2.1")  # Version marker
 
     try:
-        from core import load_schedule, get_upcoming_runs, generate_messages, format_date_uk
+        from core import load_schedule, get_upcoming_runs, generate_messages, format_date_uk, load_schedule_dataframe
 
         runs = load_schedule()
         upcoming = get_upcoming_runs(runs)
@@ -599,6 +621,14 @@ def render_compose():
                 st.write(f"**Route 2:** {run.route_2.name} | URL: `{run.route_2.url or 'None'}`")
             if run.route_3:
                 st.write(f"**Route 3:** {run.route_3.name} | URL: `{run.route_3.url or 'None'}`")
+
+            # Show DataFrame columns to debug URL issue
+            try:
+                df = load_schedule_dataframe()
+                st.write("**DataFrame columns:**")
+                st.code(str(list(df.columns)))
+            except Exception as e:
+                st.write(f"Could not load columns: {e}")
 
         # Generate messages
         messages = generate_messages(run, include_jeffing=include_jeffing)
