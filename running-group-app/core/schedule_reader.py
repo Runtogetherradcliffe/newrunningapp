@@ -292,7 +292,7 @@ def get_upcoming_runs(
     Args:
         runs: List of runs (loads from sheet if not provided)
         include_cancelled: Include cancelled runs
-        run_day_only: Only return runs on the configured run day (e.g., Thursdays)
+        run_day_only: Only return runs on the configured run days (e.g., Thursdays and Sundays)
     """
     if runs is None:
         runs = load_schedule()
@@ -306,7 +306,9 @@ def get_upcoming_runs(
         upcoming = [r for r in upcoming if not r.is_cancelled]
 
     if run_day_only:
-        upcoming = [r for r in upcoming if r.date.weekday() == config.group.run_day_of_week]
+        # Filter to only configured run days (supports multiple days)
+        run_days = config.group.run_days
+        upcoming = [r for r in upcoming if r.date.weekday() in run_days]
 
     return sorted(upcoming, key=lambda r: r.date)
 

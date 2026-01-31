@@ -27,43 +27,43 @@ from .weather import get_forecast_for_date, classify_weather, get_weather_advice
 
 INTRO_VARIANTS = [
     "We've got {num_routes} routes lined up and {num_options} great options this week:",
-    "This Thursday we've got {num_routes} routes planned and {num_options} great options to choose from:",
-    "{num_routes} routes, {num_options} great options – something for everyone this Thursday:",
-    "Fancy joining us this week? We've planned {num_routes} routes and {num_options} options for you this Thursday:",
-    "Come and join us on Thursday for a chatty run, we've got {num_routes} routes and {num_options} options to pick from:",
-    "Your Thursday evening is sorted – {num_routes} routes and {num_options} options waiting for you:",
-    "We've planned another great Thursday meetup with {num_routes} routes and {num_options} options to suit how you're feeling:",
+    "This {day_name} we've got {num_routes} routes planned and {num_options} great options to choose from:",
+    "{num_routes} routes, {num_options} great options – something for everyone this {day_name}:",
+    "Fancy joining us this week? We've planned {num_routes} routes and {num_options} options for you this {day_name}:",
+    "Come and join us on {day_name} for a chatty run, we've got {num_routes} routes and {num_options} options to pick from:",
+    "Your {day_name} is sorted – {num_routes} routes and {num_options} options waiting for you:",
+    "We've planned another great {day_name} meetup with {num_routes} routes and {num_options} options to suit how you're feeling:",
     "From gentle chats to stretch-your-legs runs, we've got {num_routes} routes and {num_options} options this week:",
-    "Looking for some midweek miles and smiles? We've lined up {num_routes} routes and {num_options} options:",
+    "Looking for some miles and smiles? We've lined up {num_routes} routes and {num_options} options:",
     "Once again we've got {num_routes} routes and {num_options} options ready – just book on and join the fun:",
 ]
 
 NICE_WEATHER_INTROS = [
-    "Looks like a decent evening for it – we've planned {num_routes} routes and {num_options} options for you this Thursday:",
+    "Looks like a decent day for it – we've planned {num_routes} routes and {num_options} options for you this {day_name}:",
     "With the weather playing nicely, it's a great week to join us for {num_routes} routes and {num_options} options:",
-    "Perfect excuse to get outside – {num_routes} routes and {num_options} friendly options waiting for you this Thursday:",
+    "Perfect excuse to get outside – {num_routes} routes and {num_options} friendly options waiting for you this {day_name}:",
 ]
 
 WET_WEATHER_INTROS = [
     "It might be a bit soggy out there, but we'll be braving the elements with {num_routes} routes and {num_options} options – come splash through the puddles with us:",
     "Rain on the forecast? All the more reason to join us – {num_routes} routes and {num_options} options to keep things fun whatever the weather:",
-    "Grab your waterproofs – we've still got {num_routes} routes and {num_options} options lined up for a proper Thursday night outing:",
+    "Grab your waterproofs – we've still got {num_routes} routes and {num_options} options lined up for a proper {day_name} outing:",
 ]
 
 COLD_WEATHER_INTROS = [
-    "Chilly evening ahead, but we'll soon warm up with {num_routes} routes and {num_options} options to choose from:",
-    "Layer up and join us this Thursday – {num_routes} routes and {num_options} cosy, chatty options to keep you moving:",
-    "Gloves and hats at the ready! We've planned {num_routes} routes and {num_options} options for a crisp Thursday night:",
+    "Chilly day ahead, but we'll soon warm up with {num_routes} routes and {num_options} options to choose from:",
+    "Layer up and join us this {day_name} – {num_routes} routes and {num_options} cosy, chatty options to keep you moving:",
+    "Gloves and hats at the ready! We've planned {num_routes} routes and {num_options} options for a crisp {day_name}:",
 ]
 
 WINDY_WEATHER_INTROS = [
-    "It could be a bit breezy, but we'll lean into it together – {num_routes} routes and {num_options} options this Thursday:",
+    "It could be a bit breezy, but we'll lean into it together – {num_routes} routes and {num_options} options this {day_name}:",
     "Wind in the hair, smiles all round – we've got {num_routes} routes and {num_options} options lined up:",
 ]
 
 HOT_WEATHER_INTROS = [
     "It's looking warm out there – {num_routes} routes and {num_options} options, just remember your water:",
-    "A warm evening ahead! We've got {num_routes} routes and {num_options} options – stay hydrated:",
+    "A warm day ahead! We've got {num_routes} routes and {num_options} options – stay hydrated:",
 ]
 
 CLOSING_VARIANTS_EMAIL = [
@@ -190,11 +190,17 @@ def _get_hilliness_blurb(distance_km: Optional[float], elevation_m: Optional[flo
     return rng.choice(TERRAIN_PHRASES[key])
 
 
+def _get_day_name(d: date) -> str:
+    """Get the day name for a date (e.g., 'Thursday', 'Sunday')."""
+    return d.strftime("%A")
+
+
 def _select_intro(
     rng: random.Random,
     weather_category: str,
     num_routes: int,
     num_options: int,
+    day_name: str,
 ) -> str:
     """Select an intro based on weather and variety."""
     pool_map = {
@@ -208,7 +214,7 @@ def _select_intro(
     pool = pool_map.get(weather_category, INTRO_VARIANTS)
     template = rng.choice(pool)
 
-    return template.format(num_routes=num_routes, num_options=num_options)
+    return template.format(num_routes=num_routes, num_options=num_options, day_name=day_name)
 
 
 def _build_route_line(label: str, route: Route, include_url: bool = True) -> str:
@@ -287,6 +293,18 @@ def generate_messages(
     )
 
 
+def _get_route_label(route: Route) -> str:
+    """Get a display label for a route (distance or name)."""
+    if route.distance_km:
+        # Format as "8k" or "5.5k"
+        dist = route.distance_km
+        if dist == int(dist):
+            return f"{int(dist)}k"
+        else:
+            return f"{dist:.1f}k"
+    return route.name or "Route"
+
+
 def _generate_email(
     run: ScheduledRun,
     rng: random.Random,
@@ -299,20 +317,25 @@ def _generate_email(
     """Generate email message."""
     config = get_config()
     date_str = format_date_uk(run.date)
+    day_name = _get_day_name(run.date)
     lines = []
 
     # Intro
-    lines.append(_select_intro(rng, weather_category, num_routes, num_options))
+    lines.append(_select_intro(rng, weather_category, num_routes, num_options, day_name))
 
-    # Options list
+    # Options list - use actual route names/distances
     if run.route_3:
         label = run.route_3.name or "Walk"
         emoji = "🚶" if "walk" in label.lower() else "🏃"
         lines.append(f"{emoji} {label}")
     if include_jeffing:
         lines.append("🏃 Jeffing")
-    lines.append("🏃 5k")
-    lines.append("🏃‍♀️ 8k")
+    if run.route_2:
+        label_2 = _get_route_label(run.route_2)
+        lines.append(f"🏃 {label_2}")
+    if run.route_1:
+        label_1 = _get_route_label(run.route_1)
+        lines.append(f"🏃‍♀️ {label_1}")
 
     lines.append("")
 
@@ -328,9 +351,11 @@ def _generate_email(
     lines.append("This week's routes")
     lines.append("")
     if run.route_1:
-        lines.append(_build_route_line("8k", run.route_1))
+        label_1 = _get_route_label(run.route_1)
+        lines.append(_build_route_line(label_1, run.route_1))
     if run.route_2:
-        lines.append(_build_route_line("5k", run.route_2))
+        label_2 = _get_route_label(run.route_2)
+        lines.append(_build_route_line(label_2, run.route_2))
     if run.route_3:
         lines.append(_build_route_line(run.route_3.name or "Walk", run.route_3))
 
@@ -369,7 +394,7 @@ def _generate_email(
 
     return GeneratedMessage(
         platform="email",
-        subject=f"{config.group.name} – this Thursday {date_str}",
+        subject=f"{config.group.name} – this {day_name} {date_str}",
         body=body,
         html_body=_convert_to_html(body),
     )
@@ -387,24 +412,29 @@ def _generate_facebook(
     """Generate Facebook post."""
     config = get_config()
     date_str = format_date_uk(run.date)
+    day_name = _get_day_name(run.date)
     lines = []
 
     # Header
-    lines.append(f"{config.group.name} – this Thursday {date_str}")
+    lines.append(f"{config.group.name} – this {day_name} {date_str}")
     lines.append("")
 
     # Intro
-    lines.append(_select_intro(rng, weather_category, num_routes, num_options))
+    lines.append(_select_intro(rng, weather_category, num_routes, num_options, day_name))
 
-    # Options list
+    # Options list - use actual route names/distances
     if run.route_3:
         label = run.route_3.name or "Walk"
         emoji = "🚶" if "walk" in label.lower() else "🏃"
         lines.append(f"{emoji} {label}")
     if include_jeffing:
         lines.append("🏃 Jeffing")
-    lines.append("🏃 5k")
-    lines.append("🏃‍♀️ 8k")
+    if run.route_2:
+        label_2 = _get_route_label(run.route_2)
+        lines.append(f"🏃 {label_2}")
+    if run.route_1:
+        label_1 = _get_route_label(run.route_1)
+        lines.append(f"🏃‍♀️ {label_1}")
 
     lines.append("")
 
@@ -424,9 +454,11 @@ def _generate_facebook(
 
     # Route details
     if run.route_1:
-        lines.append(_build_route_line("8k", run.route_1))
+        label_1 = _get_route_label(run.route_1)
+        lines.append(_build_route_line(label_1, run.route_1))
     if run.route_2:
-        lines.append(_build_route_line("5k", run.route_2))
+        label_2 = _get_route_label(run.route_2)
+        lines.append(_build_route_line(label_2, run.route_2))
 
     lines.append("")
 
@@ -462,24 +494,29 @@ def _generate_whatsapp(
     """Generate WhatsApp message."""
     config = get_config()
     date_str = format_date_uk(run.date)
+    day_name = _get_day_name(run.date)
     lines = []
 
     # Header (bold in WhatsApp)
-    lines.append(f"*{config.group.name} – Thursday {date_str}*")
+    lines.append(f"*{config.group.name} – {day_name} {date_str}*")
     lines.append("")
 
     # Intro
-    lines.append(_select_intro(rng, weather_category, num_routes, num_options))
+    lines.append(_select_intro(rng, weather_category, num_routes, num_options, day_name))
 
-    # Options list
+    # Options list - use actual route names/distances
     if run.route_3:
         label = run.route_3.name or "Walk"
         emoji = "🚶" if "walk" in label.lower() else "🏃"
         lines.append(f"- {emoji} {label}")
     if include_jeffing:
         lines.append("- 🏃 Jeffing")
-    lines.append("- 🏃 5k")
-    lines.append("- 🏃‍♀️ 8k")
+    if run.route_2:
+        label_2 = _get_route_label(run.route_2)
+        lines.append(f"- 🏃 {label_2}")
+    if run.route_1:
+        label_1 = _get_route_label(run.route_1)
+        lines.append(f"- 🏃‍♀️ {label_1}")
 
     lines.append("")
 

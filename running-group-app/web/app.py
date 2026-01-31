@@ -86,6 +86,8 @@ def _load_saved_config():
         config.booking.booking_url = st.session_state.saved_booking_url
     if "saved_cancellation_url" in st.session_state:
         config.booking.cancellation_url = st.session_state.saved_cancellation_url
+    if "saved_run_days" in st.session_state:
+        config.group.run_days = st.session_state.saved_run_days
 
     # Mark setup complete if we have a spreadsheet ID
     if config.sheet.spreadsheet_id:
@@ -350,10 +352,15 @@ def render_group_settings():
         value=default_time,
     )
 
-    run_day = st.selectbox(
-        "Run Day",
-        options=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
-        index=config.group.run_day_of_week,
+    # Convert run_days indices to day names for display
+    day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    current_run_days = [day_names[i] for i in config.group.run_days if i < 7]
+
+    run_days_selected = st.multiselect(
+        "Run Days",
+        options=day_names,
+        default=current_run_days,
+        help="Select all days when your group has scheduled runs (e.g., Thursday club run + Sunday long run)"
     )
 
     st.subheader("Booking Links")
@@ -372,6 +379,9 @@ def render_group_settings():
     )
 
     if st.button("Save Group Settings", type="primary"):
+        # Convert day names to indices
+        day_indices = [day_names.index(d) for d in run_days_selected]
+
         # Update config
         config.group.name = name
         config.group.short_name = short_name
@@ -380,7 +390,7 @@ def render_group_settings():
         config.group.timezone = timezone
         config.group.default_meeting_location = meeting_location
         config.group.default_start_time = start_time.strftime("%H:%M")
-        config.group.run_day_of_week = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].index(run_day)
+        config.group.run_days = day_indices if day_indices else [3]  # Default to Thursday if nothing selected
 
         # Update booking config
         config.booking.booking_url = booking_url
@@ -392,6 +402,7 @@ def render_group_settings():
         st.session_state.saved_start_time = start_time.strftime("%H:%M")
         st.session_state.saved_booking_url = booking_url
         st.session_state.saved_cancellation_url = cancellation_url
+        st.session_state.saved_run_days = day_indices
 
         st.success("✅ Group settings saved!")
         st.session_state.setup_complete = True
@@ -579,7 +590,7 @@ def render_calendar_settings():
 def render_compose():
     """Render the message composer page."""
     st.title("📝 Compose Messages")
-    st.caption("v2.2")  # Version marker
+    st.caption("v2.3")  # Version marker - multi-day support
 
     try:
         from core import load_schedule, get_upcoming_runs, generate_messages, format_date_uk, load_schedule_dataframe

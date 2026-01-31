@@ -29,8 +29,14 @@ class GroupConfig:
     default_meeting_location: str = "Town Centre"
     default_start_time: str = "19:00"
 
-    # Run day (0=Monday, 3=Thursday, 6=Sunday)
-    run_day_of_week: int = 3  # Thursday
+    # Run days (0=Monday, 3=Thursday, 6=Sunday)
+    # Can be a single day or multiple days for clubs with several weekly sessions
+    run_days: list = field(default_factory=lambda: [3])  # Default: Thursday only
+
+    @property
+    def run_day_of_week(self) -> int:
+        """Backwards compatibility: return first run day."""
+        return self.run_days[0] if self.run_days else 3
 
     def __post_init__(self):
         if not self.short_name:
